@@ -1,0 +1,13 @@
+# config.toml
+[alchemist]
+llm_endpoint = "http://localhost:11434" # Local LLM for privacy
+max_strategy_latency_ms = 100
+safety_thermal_threshold = 85.0
+
+[fabric]
+detection_interval_secs = 60
+latency_constraint_ns = 100
+
+[telemetry]
+enabled = true
+dashboard_host = "127.0.0.1:8501"
