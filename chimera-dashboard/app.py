@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 
-st.title("⚡ ChimeraOS Dashboard")
+st.title("ChimeraOS Dashboard")
 
 if st.session_state.connected:
     stats = st.session_state.client.get_global_stats()
