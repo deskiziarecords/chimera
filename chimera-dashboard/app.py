@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -19,3 +20,15 @@ fig = go.Figure(data=go.Scatter3d(
     mode='markers'
 ))
 st.plotly_chart(fig)
+=======
+import streamlit as st
+import plotly.graph_objects as go
+
+st.title("ChimeraOS Dashboard")
+
+if st.session_state.connected:
+    stats = st.session_state.client.get_global_stats()
+    cols = st.columns(5)
+    cols[0].metric("Total Hashrate", f"{stats['hashrate'] / 1e12:.2f} TH/s")
+    cols[1].metric("Power Draw", f"{stats['power']:.1f} kW")
+>>>>>>> b1c3fa6ecf5982d921dbc44b3f253667a676f19b

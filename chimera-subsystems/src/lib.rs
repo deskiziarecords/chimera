@@ -183,6 +183,7 @@ mod tests {
         let health = registry.get_health_status().await;
         assert!(!health.grover_active); // Default disabled
     }
+<<<<<<< HEAD
 }
 
 pub mod lir; // Add this line
@@ -200,4 +201,6 @@ pub enable_lir: bool,
     } else {
         Err(SubsystemError::SubsystemNotEnabled("LIR".to_string()))
     }
+=======
+>>>>>>> b1c3fa6ecf5982d921dbc44b3f253667a676f19b
 }
