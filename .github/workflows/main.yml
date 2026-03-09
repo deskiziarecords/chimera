@@ -1,0 +1,18 @@
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build Workspace
+        run: cargo build --workspace
+      - name: Run Tests
+        run: cargo test --workspace
+      - name: Run Phase 1 Example
+        run: cargo run --example simple-miner
