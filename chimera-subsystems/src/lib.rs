@@ -184,3 +184,20 @@ mod tests {
         assert!(!health.grover_active); // Default disabled
     }
 }
+
+pub mod lir; // Add this line
+
+// In SubsystemRegistry struct
+pub lir_engine: Option<Arc<lir::LirEngine>>,
+
+// In SubsystemConfig
+pub enable_lir: bool,
+
+// In route_task match
+"lir" => {
+    if let Some(ref engine) = self.lir_engine {
+        engine.execute(input).await
+    } else {
+        Err(SubsystemError::SubsystemNotEnabled("LIR".to_string()))
+    }
+}
