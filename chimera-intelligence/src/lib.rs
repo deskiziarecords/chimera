@@ -1,189 +1,316 @@
 //! Chimera Intelligence
 //!
-//! AI/ML optimization and inference layer for ChimeraOS.
-//! Provides gradient-based optimization for mining strategies and predictive resource allocation.
+//! Adaptive optimization layer for ChimeraOS.
+//! Observes cluster behavior and applies differentiable
+//! optimization strategies to improve scheduling,
+//! resource usage, and distributed compute performance.
 
-use chimera_core::primitives::{Hash, OpCost};
-use chimera_jax::DifferentiableHash;
-
-use thiserror::Error;
-use serde::{Deserialize, Serialize};
-
+use std::collections::HashMap;
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
 use tokio::sync::RwLock;
 
+use chimera_core::primitives::NodeId;
+use chimera_scheduler::{Scheduler, SchedulerMetrics};
+use chimera_fabric::topology::FabricTopology;
+use chimera_jax::{DifferentiableHash, OptimizationMetrics};
+
+
+
+/// Errors produced by the intelligence layer
 #[derive(Error, Debug)]
 pub enum IntelligenceError {
-    #[error("Model inference failed: {0}")]
-    InferenceFailed(String),
 
-    #[error("Optimization convergence failed: {0}")]
-    ConvergenceFailed(String),
+    #[error("Scheduler unavailable")]
+    SchedulerUnavailable,
 
-    #[error("Training data insufficient: {0}")]
-    InsufficientData(String),
+    #[error("Optimization failed")]
+    OptimizationFailed,
 
-    #[error("Prediction error: {0}")]
-    PredictionError(String),
+    #[error("Node not found")]
+    NodeNotFound,
 }
 
+
+
+/// Strategy parameters that guide optimization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntelligenceConfig {
-    pub enable_ml_inference: bool,
+pub struct Strategy {
+
+    /// learning rate for optimization
     pub learning_rate: f64,
-    pub convergence_threshold: f64,
-    pub max_iterations: u32,
-    pub prediction_window_ms: u64,
+
+    /// maximum gradient norm
+    pub gradient_clip: f64,
+
+    /// scheduling bias factor
+    pub scheduling_bias: f64,
 }
 
-impl Default for IntelligenceConfig {
+
+
+impl Default for Strategy {
+
     fn default() -> Self {
+
         Self {
-            enable_ml_inference: false,
-            learning_rate: 0.001,
-            convergence_threshold: 0.0001,
-            max_iterations: 1000,
-            prediction_window_ms: 100,
+            learning_rate: 0.01,
+            gradient_clip: 10.0,
+            scheduling_bias: 1.0,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OptimizationResult {
-    pub optimized_parameters: Vec<f64>,
-    pub predicted_hashrate: f64,
-    pub predicted_power_draw: f64,
-    pub confidence_score: f64,
-    pub iterations_to_converge: u32,
+
+
+/// Node-level telemetry used for optimization.
+#[derive(Debug, Clone, Default)]
+pub struct NodeTelemetry {
+
+    pub cpu_load: f64,
+    pub active_tasks: usize,
+    pub latency: f64,
 }
 
+
+
+/// Intelligence engine
 pub struct IntelligenceEngine {
-    config: IntelligenceConfig,
-    differentiable_hash: Arc<DifferentiableHash>,
-    optimization_history: Arc<RwLock<Vec<OpCost>>>,
+
+    scheduler: Arc<Scheduler>,
+
+    topology: Arc<RwLock<FabricTopology>>,
+
+    optimizer: Arc<RwLock<DifferentiableHash>>,
+
+    strategy: Arc<RwLock<Strategy>>,
+
+    telemetry: Arc<RwLock<HashMap<NodeId, NodeTelemetry>>>,
+
+    history: Arc<RwLock<Vec<OptimizationMetrics>>>,
 }
+
+
 
 impl IntelligenceEngine {
 
-    pub fn new(config: IntelligenceConfig) -> Self {
+    pub fn new(
+        scheduler: Arc<Scheduler>,
+        topology: Arc<RwLock<FabricTopology>>,
+    ) -> Self {
+
         Self {
-            config,
-            differentiable_hash: Arc::new(DifferentiableHash::new()),
-            optimization_history: Arc::new(RwLock::new(Vec::new())),
+
+            scheduler,
+
+            topology,
+
+            optimizer: Arc::new(RwLock::new(
+                DifferentiableHash::new()
+            )),
+
+            strategy: Arc::new(RwLock::new(
+                Strategy::default()
+            )),
+
+            telemetry: Arc::new(RwLock::new(HashMap::new())),
+
+            history: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
-    pub async fn optimize_strategy(
+
+
+    /// Update node telemetry
+    pub async fn update_telemetry(
         &self,
-        initial_params: &[f64],
-        target_metric: &str,
-    ) -> Result<OptimizationResult, IntelligenceError> {
+        node_id: NodeId,
+        cpu_load: f64,
+        active_tasks: usize,
+        latency: f64,
+    ) {
 
-        let mut params = initial_params.to_vec();
-        let mut iterations = 0;
-        let mut prev_loss = f64::INFINITY;
+        let mut telemetry = self.telemetry.write().await;
 
-        for i in 0..self.config.max_iterations {
+        telemetry.insert(
+            node_id,
+            NodeTelemetry {
+                cpu_load,
+                active_tasks,
+                latency,
+            },
+        );
+    }
 
-            let (mut loss, gradient) =
-                self.differentiable_hash.compute_gradient(&params);
 
-            // Metric-based weighting
-            loss = match target_metric {
-                "energy" => loss * 1.2,
-                "thermal" => loss * 1.1,
-                "balanced" => loss * 0.9,
-                _ => loss,
-            };
 
-            // Relative convergence
-            let change = ((prev_loss - loss) / prev_loss.abs()).abs();
+    /// Analyze cluster metrics
+    pub async fn analyze_cluster(
+        &self,
+    ) -> Result<ClusterAnalysis, IntelligenceError> {
 
-            if change < self.config.convergence_threshold {
-                tracing::info!("Converged after {} iterations", i);
-                iterations = i;
-                break;
-            }
+        let metrics = self.scheduler.metrics().await;
 
-            for (param, grad) in params.iter_mut().zip(gradient.iter()) {
-                *param -= self.config.learning_rate * grad;
-            }
+        let telemetry = self.telemetry.read().await;
 
-            prev_loss = loss;
-            iterations = i;
-        }
+        let node_count = telemetry.len();
 
-        Ok(OptimizationResult {
-            optimized_parameters: params,
-            predicted_hashrate: 10_000_000.0,
-            predicted_power_draw: 50.0,
-            confidence_score: 0.95,
-            iterations_to_converge: iterations,
+        let avg_load = if node_count == 0 {
+            0.0
+        } else {
+            telemetry
+                .values()
+                .map(|n| n.cpu_load)
+                .sum::<f64>() / node_count as f64
+        };
+
+        Ok(ClusterAnalysis {
+
+            pending_tasks: metrics.pending,
+            running_tasks: metrics.running,
+            completed_tasks: metrics.completed,
+            avg_cpu_load: avg_load,
+            node_count,
         })
     }
 
-    pub async fn predict_allocation(
+
+
+    /// Run differentiable optimization step
+    pub async fn optimize(
         &self,
-        current_load: f64,
-        available_resources: usize,
-    ) -> Result<f64, IntelligenceError> {
+        parameters: Vec<f64>,
+    ) -> Result<OptimizationMetrics, IntelligenceError> {
 
-        let prediction = current_load * 1.1;
+        let optimizer = self.optimizer.read().await;
 
-        Ok(prediction.min(available_resources as f64))
+        let (loss, gradient) =
+            optimizer.compute_gradient(&parameters);
+
+        let metrics =
+            OptimizationMetrics::new(&gradient, loss, 1);
+
+        let mut history = self.history.write().await;
+
+        history.push(metrics.clone());
+
+        Ok(metrics)
     }
 
-    pub async fn record_metric(&self, cost: OpCost) {
 
-        let mut history = self.optimization_history.write().await;
 
-        history.push(cost);
+    /// Apply optimization updates to strategy
+    pub async fn update_strategy(
+        &self,
+        metrics: OptimizationMetrics,
+    ) {
 
-        if history.len() > 1000 {
-            history.remove(0);
+        let mut strategy = self.strategy.write().await;
+
+        if metrics.gradient_norm > strategy.gradient_clip {
+
+            strategy.learning_rate *= 0.9;
+        } else {
+
+            strategy.learning_rate *= 1.05;
         }
+
+        strategy.learning_rate =
+            strategy.learning_rate.clamp(0.0001, 0.1);
     }
 
-    pub async fn get_history(&self) -> Vec<OpCost> {
 
-        let history = self.optimization_history.read().await;
 
-        history.clone()
+    /// Intelligence scheduling cycle
+    pub async fn control_loop(
+        &self,
+    ) -> Result<(), IntelligenceError> {
+
+        let analysis = self.analyze_cluster().await?;
+
+        let params = vec![
+            analysis.pending_tasks as f64,
+            analysis.running_tasks as f64,
+            analysis.avg_cpu_load,
+        ];
+
+        let metrics = self.optimize(params).await?;
+
+        self.update_strategy(metrics).await;
+
+        Ok(())
+    }
+
+
+
+    /// Retrieve current strategy
+    pub async fn strategy(
+        &self,
+    ) -> Strategy {
+
+        self.strategy.read().await.clone()
+    }
+
+
+
+    /// Optimization history
+    pub async fn history(
+        &self,
+    ) -> Vec<OptimizationMetrics> {
+
+        self.history.read().await.clone()
     }
 }
 
-pub trait IntelligentTransform: Send + Sync {
 
-    fn predict(&self, input: Hash)
-        -> Result<Hash, IntelligenceError>;
 
-    fn optimize(&self, params: &[f64])
-        -> Result<OptimizationResult, IntelligenceError>;
+/// Cluster state summary
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterAnalysis {
 
-    fn cost(&self) -> OpCost;
+    pub pending_tasks: usize,
+
+    pub running_tasks: usize,
+
+    pub completed_tasks: usize,
+
+    pub avg_cpu_load: f64,
+
+    pub node_count: usize,
 }
+
+
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use tokio::sync::mpsc;
+
+    use chimera_bus::BusManager;
+    use chimera_scheduler::Scheduler;
+    use chimera_fabric::topology::FabricTopology;
 
     #[tokio::test]
-    async fn test_optimization_engine() {
+    async fn test_intelligence_cycle() {
 
-        let config = IntelligenceConfig::default();
-        let engine = IntelligenceEngine::new(config);
+        let bus = Arc::new(BusManager::new());
 
-        let initial_params = vec![1.0, 2.0, 3.0];
+        let topology =
+            Arc::new(RwLock::new(FabricTopology::default()));
 
-        let result = engine
-            .optimize_strategy(&initial_params, "hashrate")
-            .await;
+        let scheduler =
+            Arc::new(Scheduler::new(bus, topology.clone()));
 
-        assert!(result.is_ok());
+        let engine =
+            IntelligenceEngine::new(scheduler, topology);
 
-        let opt_result = result.unwrap();
+        let metrics =
+            engine.optimize(vec![1.0,2.0,3.0]).await.unwrap();
 
-        assert!(opt_result.iterations_to_converge < 1000);
+        assert!(metrics.loss_value > 0.0);
     }
 }
