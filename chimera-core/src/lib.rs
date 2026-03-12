@@ -5,11 +5,17 @@
 //! Provides:
 //! - Core cryptographic primitives
 //! - Differentiable transform system
+//! - SIMD batch hashing utilities
 //! - Mining orchestration via Alchemist
+
+// ==========================
+// Module Declarations
+// ==========================
 
 pub mod primitives;
 pub mod transforms;
 pub mod alchemist;
+pub mod simd;
 
 
 
@@ -39,7 +45,14 @@ pub use transforms::{
     VMap,
 };
 
-// Alchemist
+// SIMD hashing
+pub use simd::{
+    SimdHasher,
+    NonceBatch,
+    HashBatch,
+};
+
+// Alchemist engine
 pub use alchemist::{
     Alchemist,
     AlchemistConfig,
@@ -58,6 +71,10 @@ pub const EDITION: &str = "2021";
 
 
 
+// ==========================
+// Build Information
+// ==========================
+
 /// Build metadata for ChimeraOS.
 #[derive(Debug, Clone)]
 pub struct BuildInfo {
@@ -67,8 +84,6 @@ pub struct BuildInfo {
     pub rustc: String,
     pub git_hash: String,
 }
-
-
 
 /// Returns build information.
 pub fn build_info() -> BuildInfo {
@@ -84,8 +99,6 @@ pub fn build_info() -> BuildInfo {
             .to_string(),
     }
 }
-
-
 
 impl std::fmt::Display for BuildInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -121,6 +134,14 @@ pub mod prelude {
         HashTransform,
         NonceTransform,
         OpCostTransform,
+        ActivationFn,
+        VMap,
+    };
+
+    pub use crate::simd::{
+        SimdHasher,
+        NonceBatch,
+        HashBatch,
     };
 
     pub use crate::alchemist::{
@@ -138,7 +159,6 @@ pub mod prelude {
 
 /// Initialize ChimeraOS core.
 pub fn init() -> Result<(), CoreError> {
-
     let _ = tracing_subscriber::fmt::try_init();
 
     tracing::info!("ChimeraOS Core initialized (v{})", VERSION);
@@ -148,6 +168,7 @@ pub fn init() -> Result<(), CoreError> {
 
 
 
+/// Core-specific error types.
 #[derive(Debug, thiserror::Error)]
 pub enum CoreError {
 
@@ -162,6 +183,10 @@ pub enum CoreError {
 }
 
 
+
+// ==========================
+// Tests
+// ==========================
 
 #[cfg(test)]
 mod tests {
