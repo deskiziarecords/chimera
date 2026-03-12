@@ -1,0 +1,33 @@
+[package]
+name = "chimera-alchemist"
+version = "0.1.0"
+edition = "2021"
+description = "Strategy evolution engine for ChimeraOS"
+license = "MIT"
+authors = ["ChimeraOS Contributors"]
+
+[lib]
+name = "chimera_alchemist"
+path = "src/lib.rs"
+
+[dependencies]
+
+# Async runtime
+tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
+
+# Random mutation engine
+rand = "0.8"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+
+# Error handling
+thiserror = "1"
+
+# Internal Chimera crates
+chimera-core = { path = "../chimera-core" }
+chimera-intelligence = { path = "../chimera-intelligence" }
+
+[dev-dependencies]
+
+tokio = { version = "1", features = ["macros", "rt"] }
