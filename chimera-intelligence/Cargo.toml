@@ -1,4 +1,3 @@
-```toml
 [package]
 name = "chimera-intelligence"
 version = "0.1.0"
@@ -10,8 +9,11 @@ authors = ["Chimera Project"]
 
 [dependencies]
 
-# Workspace core
+# Core system
 chimera-core = { path = "../chimera-core" }
+chimera-fabric = { path = "../chimera-fabric" }
+chimera-scheduler = { path = "../chimera-scheduler" }
+chimera-jax = { path = "../chimera-jax", optional = true }
 
 # Async runtime
 tokio = { version = "1.36", features = ["rt-multi-thread", "macros", "sync", "time"] }
@@ -37,7 +39,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 # Data structures
 indexmap = "2.2"
 
-# Math / optimization (for differentiable mining)
+# Math / optimization
 nalgebra = "0.32"
 
 # Time utilities
@@ -57,19 +59,10 @@ default = ["std"]
 
 std = []
 
-# Enables experimental differentiable mining optimizer
-differentiable-mining = []
+# Enables differentiable optimization
+differentiable-mining = ["chimera-jax"]
 
-# Enables advanced hardware backends
+# Future compute backends
 gpu = []
 fpga = []
 quantum = []
-
-[profile.release]
-
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-```
