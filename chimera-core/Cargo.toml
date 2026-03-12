@@ -1,36 +1,55 @@
 [package]
 name = "chimera-core"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-description = "Foundational primitives and orchestration engine for ChimeraOS"
+version = "0.1.0"
+edition = "2021"
+description = "Core primitives, transforms, and orchestration engine for ChimeraOS"
+license = "MIT"
+repository = "https://github.com/deskiziarecords/chimera"
+authors = ["ChimeraOS"]
+readme = "README.md"
+
+[lib]
+name = "chimera_core"
+path = "src/lib.rs"
+
+# -------------------------
+# Dependencies
+# -------------------------
 
 [dependencies]
-# Workspace
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-async-trait = { workspace = true }
-tracing = { workspace = true }
-chrono = { workspace = true }
-hex = { workspace = true }
-rand = { workspace = true }
-fxhash = { workspace = true }
 
-# Internal
-chimera-fabric = { path = "../chimera-fabric" }
-chimera-cell = { path = "../chimera-cell" }
-chimera-intelligence = { path = "../chimera-intelligence" }
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
 
-[build-dependencies]
-vergen = { workspace = true }
+# Error handling
+thiserror = "1.0"
+
+# Random numbers (HashTransform initialization)
+rand = "0.8"
+
+# Logging / telemetry
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+# Optional build metadata support
+vergen = { version = "8", optional = true }
+
+# -------------------------
+# Dev dependencies
+# -------------------------
 
 [dev-dependencies]
-criterion = { workspace = true }
-tokio-test = { workspace = true }
 
-[[bench]]
-name = "core_benchmark"
-harness = false
+serde_json = "1.0"
+
+
+# -------------------------
+# Feature Flags
+# -------------------------
+
+[features]
+
+default = []
+
+# Enable extra build metadata
+build-info = ["vergen"]
