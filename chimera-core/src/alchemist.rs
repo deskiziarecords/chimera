@@ -103,7 +103,36 @@ impl Alchemist {
 
         Ok(())
     }
+    /// integrate simd
+    pub fn mine_simd(
+    &self,
+    start_nonce: Nonce,
+    iterations: u64,
+    hash_fn: Arc<dyn Fn(Nonce) -> Hash + Send + Sync>,
+) -> Vec<f64> {
 
+    use crate::simd::{NonceBatch, SimdHasher};
+
+    let hasher = SimdHasher::new(move |n| hash_fn(n));
+
+    let mut results = Vec::new();
+    let mut nonce = start_nonce;
+
+    for _ in 0..iterations {
+
+        let batch = NonceBatch::new(nonce);
+
+        let hashes = hasher.hash_batch(&batch);
+
+        for h in hashes.hashes.iter() {
+            results.push(self.evaluate_hash(*h));
+        }
+
+        nonce.0 += 8;
+    }
+
+    results
+}
     /// Benchmark hashing performance for the current node.
     pub fn benchmark(&self, iterations: u64) -> f64 {
         let mut header = BlockHeader::new(
