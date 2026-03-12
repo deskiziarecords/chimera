@@ -1,39 +1,75 @@
+```toml
 [package]
 name = "chimera-intelligence"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-description = "AI/ML optimization and inference layer"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chimera adaptive intelligence engine for topology-aware mining and optimization"
+repository = "https://github.com/deskiziarecords/chimera"
+authors = ["Chimera Project"]
 
 [dependencies]
-# Workspace
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-rand = { workspace = true }
-ndarray = { workspace = true }
 
-# Internal
+# Workspace core
 chimera-core = { path = "../chimera-core" }
-chimera-fabric = { path = "../chimera-fabric" }
-chimera-crypto = { path = "../chimera-crypto" }
-chimera-jax = { path = "../chimera-jax" }
 
-# Optional: ML inference
-candle-core = { version = "0.3", optional = true }
-candle-nn = { version = "0.3", optional = true }
+# Async runtime
+tokio = { version = "1.36", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
-[features]
-default = []
-ml-inference = ["candle-core", "candle-nn"]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Hardware / system detection
+num_cpus = "1.16"
+
+# Randomness
+rand = { version = "0.8", features = ["std"] }
+
+# Logging / telemetry
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+# Data structures
+indexmap = "2.2"
+
+# Math / optimization (for differentiable mining)
+nalgebra = "0.32"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async utilities
+futures = "0.3"
 
 [dev-dependencies]
-tokio-test = { workspace = true }
-criterion = { workspace = true }
 
-[[bench]]
-name = "optimization_benchmark"
-harness = false
+tokio = { version = "1.36", features = ["rt", "macros"] }
+criterion = "0.5"
+
+[features]
+
+default = ["std"]
+
+std = []
+
+# Enables experimental differentiable mining optimizer
+differentiable-mining = []
+
+# Enables advanced hardware backends
+gpu = []
+fpga = []
+quantum = []
+
+[profile.release]
+
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+```
