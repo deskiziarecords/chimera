@@ -1,10 +1,10 @@
 [package]
-name = "chimera-fabric"
+name = "chimera-state"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Hardware and memory abstraction layer"
+description = "Persistent state and checkpointing"
 
 [dependencies]
 # Workspace
@@ -17,8 +17,8 @@ tracing = { workspace = true }
 # Internal
 chimera-core = { path = "../chimera-core" }
 
-# Hardware Detection
-num_cpus = "1.0"
+# Storage Backend
+sled = "0.34"
 
 [dev-dependencies]
 tokio-test = { workspace = true }

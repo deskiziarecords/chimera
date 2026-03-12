@@ -1,24 +1,22 @@
 [package]
-name = "chimera-fabric"
+name = "chimera-scheduler"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Hardware and memory abstraction layer"
+description = "Task scheduler for distributed orchestration"
 
 [dependencies]
 # Workspace
 tokio = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 # Internal
 chimera-core = { path = "../chimera-core" }
-
-# Hardware Detection
-num_cpus = "1.0"
+chimera-fabric = { path = "../chimera-fabric" }
+chimera-bus = { path = "../chimera-bus" }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

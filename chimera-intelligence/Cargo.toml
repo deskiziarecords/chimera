@@ -1,36 +1,38 @@
 [package]
 name = "chimera-intelligence"
-version = "0.1.0"
-edition = "2021"
-authors = ["José Roberto Jiménez Cordero <tijuanapaint@gmail.com>"]
-license = "MIT"
-description = "AI/ML optimization and inference layer for ChimeraOS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "AI/ML optimization and inference layer"
 
 [dependencies]
-# Internal Workspace Dependencies
+# Workspace
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+ndarray = { workspace = true }
+
+# Internal
 chimera-core = { path = "../chimera-core" }
 chimera-fabric = { path = "../chimera-fabric" }
 chimera-crypto = { path = "../chimera-crypto" }
 chimera-jax = { path = "../chimera-jax" }
 
-# External Dependencies
-tokio = { version = "1.35", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tracing = "0.1"
-ndarray = "0.15"              # Numerical computing for ML
-rand = "0.8"                  # Random number generation for optimization
-candle-core = { version = "0.3", optional = true }  # ML inference (optional)
+# Optional: ML inference
+candle-core = { version = "0.3", optional = true }
 candle-nn = { version = "0.3", optional = true }
 
 [features]
 default = []
-ml-inference = ["candle-core", "candle-nn"]  # Enable ML model inference
+ml-inference = ["candle-core", "candle-nn"]
 
 [dev-dependencies]
-tokio-test = "0.4"
-criterion = "0.5"
+tokio-test = { workspace = true }
+criterion = { workspace = true }
 
 [[bench]]
 name = "optimization_benchmark"

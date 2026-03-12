@@ -1,36 +1,37 @@
 [package]
-name = "chimera-core"
+name = "chimera-crypto"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Foundational primitives and orchestration engine for ChimeraOS"
+description = "Cryptographic hash implementations"
 
 [dependencies]
 # Workspace
 tokio = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
-async-trait = { workspace = true }
 tracing = { workspace = true }
-chrono = { workspace = true }
+sha2 = { workspace = true }
+digest = { workspace = true }
 hex = { workspace = true }
-rand = { workspace = true }
-fxhash = { workspace = true }
 
 # Internal
+chimera-core = { path = "../chimera-core" }
 chimera-fabric = { path = "../chimera-fabric" }
-chimera-cell = { path = "../chimera-cell" }
-chimera-intelligence = { path = "../chimera-intelligence" }
 
-[build-dependencies]
-vergen = { workspace = true }
+# Optional: Assembly optimizations for x86_64
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+sha2-asm = { version = "0.6", optional = true }
+
+[features]
+default = []
+asm = ["sha2-asm"]
 
 [dev-dependencies]
 criterion = { workspace = true }
 tokio-test = { workspace = true }
 
 [[bench]]
-name = "core_benchmark"
+name = "sha256_benchmark"
 harness = false

@@ -1,43 +1,39 @@
 [package]
 name = "chimera-subsystems"
-version = "0.1.0"
-edition = "2021"
-authors = ["José Roberto Jiménez Cordero <tijuanapaint@gmail.com>"]
-license = "MIT"
-description = "Specialized domain subsystems for ChimeraOS (Phase 3)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Specialized domain subsystems (Phase 3)"
 
 [dependencies]
-# Internal Workspace Dependencies
+# Workspace
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+num-bigint = { workspace = true }
+num-complex = { workspace = true }
+
+# Internal
 chimera-core = { path = "../chimera-core" }
 chimera-fabric = { path = "../chimera-fabric" }
 chimera-crypto = { path = "../chimera-crypto" }
 chimera-cell = { path = "../chimera-cell" }
 chimera-intelligence = { path = "../chimera-intelligence" }
 
-# External Dependencies
-tokio = { version = "1.35", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tracing = "0.1"
-num-bigint = "0.4"           # For quantum math operations
-num-complex = "0.4"          # For complex number operations (quantum)
-
-# Optional hardware-specific dependencies
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-intrinsics = { version = "0.1", optional = true }  # CPU intrinsics
-
 [features]
 default = ["grover", "echovoid"]
-grover = []                    # Enable quantum algorithm validation
-echovoid = []                  # Enable advanced mathematics validation
-vpi = []                       # Enable physics validations
-sst = []                       # Enable FPGA interactions
-sonar = []                     # Enable signal processing
+grover = []
+echovoid = []
+vpi = []
+sst = []
+sonar = []
 
 [dev-dependencies]
-tokio-test = "0.4"
-criterion = "0.5"
+tokio-test = { workspace = true }
+criterion = { workspace = true }
 
 [[bench]]
 name = "subsystem_benchmark"

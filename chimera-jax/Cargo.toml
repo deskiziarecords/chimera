@@ -1,30 +1,32 @@
 [package]
 name = "chimera-jax"
-version = "0.1.0"
-edition = "2021"
-authors = ["José Roberto Jiménez Cordero <tijuanapaint@gmail.com>"]
-license = "MIT"
-description = "Differentiable hash approximation layer for ChimeraOS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Differentiable hash approximation layer"
 
 [dependencies]
-# Internal Workspace Dependencies
+# Workspace
+tokio = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+ndarray = { workspace = true }
+
+# Internal
 chimera-core = { path = "../chimera-core" }
 
-# External Dependencies
-tokio = { version = "1.35", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
-tracing = "0.1"
-ndarray = "0.15"              # Numerical computing for gradients
-autodiff = { version = "0.6", optional = true }  # Automatic differentiation
+# Optional: Automatic differentiation
+autodiff = { version = "0.6", optional = true }
 
 [features]
 default = []
-autodiff = ["autodiff"]        # Enable automatic differentiation
+autodiff = ["autodiff"]
 
 [dev-dependencies]
-tokio-test = "0.4"
-criterion = "0.5"
+tokio-test = { workspace = true }
+criterion = { workspace = true }
 
 [[bench]]
 name = "gradient_benchmark"

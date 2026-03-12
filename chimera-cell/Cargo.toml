@@ -1,0 +1,31 @@
+[package]
+name = "chimera-cell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "WASM execution sandbox"
+
+[dependencies]
+# Workspace
+tokio = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+wasmtime = { workspace = true }
+
+# Internal
+chimera-core = { path = "../chimera-core" }
+
+[features]
+default = ["sandbox-isolation"]
+sandbox-isolation = []
+profiling = []
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "wasm_execution_benchmark"
+harness = false

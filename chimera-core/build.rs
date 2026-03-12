@@ -3,6 +3,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_timestamp()
         .rustc_semver()
         .git_sha(true)
+        .cargo_target_triple()
         .emit()?;
     Ok(())
 }
