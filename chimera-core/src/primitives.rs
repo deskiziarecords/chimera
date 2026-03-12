@@ -1,371 +1,240 @@
-//! ChimeraOS Core Primitives
+//! Alchemist
 //!
-//! Defines fundamental types used across the Chimera system.
+//! Core orchestrator for ChimeraOS mining pipelines.
+//! Combines transforms, nonce exploration, and cost optimization
+//! to discover optimal mining strategies.
+
+use crate::primitives::{Hash, Nonce, OpCost};
+use crate::transforms::{
+    ActivationFn, HashTransform, NonceTransform, OpCostTransform, Transform, TransformChain,
+};
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::hash::Hash as StdHash;
-use std::sync::atomic::{AtomicU64, Ordering};
-use thiserror::Error;
+use std::sync::Arc;
 
-//
-// HASH
-//
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, StdHash, Serialize, Deserialize)]
-pub struct Hash(pub [u8; 32]);
-
-impl Hash {
-    pub fn zero() -> Self {
-        Hash([0u8; 32])
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.0.iter().all(|&b| b == 0)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
-    pub fn from_hex(s: &str) -> Result<Self, PrimitiveError> {
-        let bytes = hex::decode(s).map_err(|e| PrimitiveError::InvalidHex(e.to_string()))?;
-
-        if bytes.len() != 32 {
-            return Err(PrimitiveError::InvalidHashLength(bytes.len()));
-        }
-
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-
-        Ok(Hash(arr))
-    }
-
-    /// Count leading zero bits.
-    pub fn leading_zeros(&self) -> u32 {
-        let mut count = 0;
-
-        for byte in &self.0 {
-            if *byte == 0 {
-                count += 8;
-            } else {
-                count += byte.leading_zeros();
-                break;
-            }
-        }
-
-        count
-    }
-
-    pub fn meets_difficulty(&self, target: &Hash) -> bool {
-        self <= target
-    }
-}
-
-impl Default for Hash {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl fmt::Display for Hash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_hex())
-    }
-}
-
-impl From<[u8; 32]> for Hash {
-    fn from(bytes: [u8; 32]) -> Self {
-        Hash(bytes)
-    }
-}
-
-impl From<Hash> for [u8; 32] {
-    fn from(hash: Hash) -> Self {
-        hash.0
-    }
-}
-
-//
-// NONCE
-//
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, StdHash, Serialize, Deserialize)]
-pub struct Nonce(pub u64);
-
-impl Nonce {
-    pub fn zero() -> Self {
-        Nonce(0)
-    }
-
-    pub fn increment(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(1);
-        self.0
-    }
-
-    pub fn value(&self) -> u64 {
-        self.0
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.0 == 0
-    }
-}
-
-impl Default for Nonce {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl fmt::Display for Nonce {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<u64> for Nonce {
-    fn from(v: u64) -> Self {
-        Nonce(v)
-    }
-}
-
-impl From<Nonce> for u64 {
-    fn from(n: Nonce) -> Self {
-        n.0
-    }
-}
-
-//
-// NODE ID
-//
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, StdHash, Serialize, Deserialize)]
-pub struct NodeId(pub [u8; 32]);
-
-impl NodeId {
-    pub fn zero() -> Self {
-        NodeId([0u8; 32])
-    }
-
-    pub fn random() -> Self {
-        use rand::Rng;
-
-        let mut rng = rand::thread_rng();
-        let mut bytes = [0u8; 32];
-
-        rng.fill(&mut bytes);
-
-        NodeId(bytes)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
-    pub fn from_hex(s: &str) -> Result<Self, PrimitiveError> {
-        let bytes = hex::decode(s).map_err(|e| PrimitiveError::InvalidHex(e.to_string()))?;
-
-        if bytes.len() != 32 {
-            return Err(PrimitiveError::InvalidNodeIdLength(bytes.len()));
-        }
-
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-
-        Ok(NodeId(arr))
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.0.iter().all(|&b| b == 0)
-    }
-
-    pub fn short_id(&self) -> String {
-        let hex = self.to_hex();
-        hex.get(0..8).unwrap_or(&hex).to_string()
-    }
-}
-
-impl Default for NodeId {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-impl fmt::Display for NodeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.short_id())
-    }
-}
-
-//
-// DIFFICULTY
-//
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Difficulty(pub [u8; 32]);
-
-impl Difficulty {
-    pub fn from_target(target: Hash) -> Self {
-        Difficulty(target.0)
-    }
-
-    pub fn to_target(&self) -> Hash {
-        Hash(self.0)
-    }
-
-    pub fn meets_difficulty(&self, hash: &Hash) -> bool {
-        hash.meets_difficulty(&self.to_target())
-    }
-}
-
-impl Default for Difficulty {
-    fn default() -> Self {
-        let mut target = [0xffu8; 32];
-        target[0] = 0;
-
-        Difficulty(target)
-    }
-}
-
-//
-// BLOCK HEADER
-//
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockHeader {
-    pub prev_hash: Hash,
-    pub merkle_root: Hash,
-    pub timestamp: u64,
-    pub difficulty: Difficulty,
-    pub nonce: Nonce,
-    pub version: u32,
-}
-
-impl BlockHeader {
-    pub fn new(
-        prev_hash: Hash,
-        merkle_root: Hash,
-        timestamp: u64,
-        difficulty: Difficulty,
-    ) -> Self {
-        Self {
-            prev_hash,
-            merkle_root,
-            timestamp,
-            difficulty,
-            nonce: Nonce::zero(),
-            version: 1,
-        }
-    }
-
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(116);
-
-        bytes.extend_from_slice(&self.prev_hash.0);
-        bytes.extend_from_slice(&self.merkle_root.0);
-        bytes.extend_from_slice(&self.timestamp.to_le_bytes());
-        bytes.extend_from_slice(&self.difficulty.0);
-        bytes.extend_from_slice(&self.nonce.0.to_le_bytes());
-        bytes.extend_from_slice(&self.version.to_le_bytes());
-
-        bytes
-    }
-
-    pub fn increment_nonce(&mut self) -> u64 {
-        self.nonce.increment()
-    }
-
-    pub fn reset_nonce(&mut self) {
-        self.nonce = Nonce::zero();
-    }
-}
-
-//
-// MINING RESULT
-//
-
+/// Result returned by a mining attempt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MiningResult {
-    pub hash: Hash,
     pub nonce: Nonce,
-    pub time_seconds: f64,
-    pub attempts: u64,
-    pub node_id: NodeId,
+    pub hash: Hash,
+    pub score: f64,
+    pub cost: OpCost,
 }
 
-impl MiningResult {
-    pub fn new(hash: Hash, nonce: Nonce, time_seconds: f64, attempts: u64, node_id: NodeId) -> Self {
-        Self {
-            hash,
-            nonce,
-            time_seconds,
-            attempts,
-            node_id,
-        }
-    }
 
-    pub fn effective_hashrate(&self) -> f64 {
-        if self.time_seconds == 0.0 {
-            return 0.0;
-        }
 
-        self.attempts as f64 / self.time_seconds
-    }
+/// Alchemist configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlchemistConfig {
+    pub hash_dim: usize,
+    pub nonce_stride: u64,
+    pub max_nonce: u64,
+    pub activation: ActivationFn,
 }
 
-//
-// ATOMIC NONCE
-//
-
-pub struct AtomicNonce {
-    counter: AtomicU64,
-}
-
-impl AtomicNonce {
-    pub fn new(initial: u64) -> Self {
-        Self {
-            counter: AtomicU64::new(initial),
-        }
-    }
-
-    pub fn next(&self) -> Nonce {
-        Nonce(self.counter.fetch_add(1, Ordering::SeqCst))
-    }
-
-    pub fn current(&self) -> Nonce {
-        Nonce(self.counter.load(Ordering::SeqCst))
-    }
-
-    pub fn reset(&self, value: u64) {
-        self.counter.store(value, Ordering::SeqCst);
-    }
-}
-
-impl Default for AtomicNonce {
+impl Default for AlchemistConfig {
     fn default() -> Self {
-        Self::new(0)
+        Self {
+            hash_dim: 32,
+            nonce_stride: 1,
+            max_nonce: u64::MAX,
+            activation: ActivationFn::ReLU,
+        }
     }
 }
 
-//
-// ERRORS
-//
 
-#[derive(Error, Debug)]
-pub enum PrimitiveError {
-    #[error("Invalid hex string: {0}")]
-    InvalidHex(String),
 
-    #[error("Invalid hash length: expected 32 bytes, got {0}")]
-    InvalidHashLength(usize),
+/// Alchemist miner core.
+pub struct Alchemist {
 
-    #[error("Invalid NodeId length: expected 32 bytes, got {0}")]
-    InvalidNodeIdLength(usize),
+    /// Transform approximating hash behavior
+    hash_transform: HashTransform,
 
-    #[error("Difficulty not met: hash {hash} > target {target}")]
-    DifficultyNotMet { hash: Hash, target: Hash },
+    /// Nonce stepping strategy
+    nonce_transform: NonceTransform,
 
-    #[error("Invalid parameter: {0}")]
-    InvalidParameter(String),
+    /// Cost scoring transform
+    cost_transform: OpCostTransform,
+
+    /// Hash transform pipeline
+    hash_chain: TransformChain<Hash>,
+
+    /// Nonce transform pipeline
+    nonce_chain: TransformChain<Nonce>,
+}
+
+impl Alchemist {
+
+    /// Create a new alchemist instance.
+    pub fn new(config: AlchemistConfig) -> Self {
+
+        let hash_transform =
+            HashTransform::new(config.hash_dim, config.activation);
+
+        let nonce_transform =
+            NonceTransform::new(config.nonce_stride, config.max_nonce);
+
+        let cost_transform =
+            OpCostTransform::new(0.5, 0.3, 0.2);
+
+        let mut hash_chain = TransformChain::new();
+        let mut nonce_chain = TransformChain::new();
+
+        hash_chain.add(hash_transform.clone());
+        nonce_chain.add(nonce_transform.clone());
+
+        Self {
+            hash_transform,
+            nonce_transform,
+            cost_transform,
+            hash_chain,
+            nonce_chain,
+        }
+    }
+
+
+
+    /// Compute approximate hash score.
+    pub fn evaluate_hash(&self, hash: Hash) -> f64 {
+
+        let approx = self.hash_chain.apply(hash);
+
+        approx.iter().sum::<f64>() / approx.len() as f64
+    }
+
+
+
+    /// Evaluate operational cost score.
+    pub fn evaluate_cost(&self, cost: OpCost) -> f64 {
+        self.cost_transform.apply(cost)
+    }
+
+
+
+    /// Run a single mining step.
+    pub fn step(
+        &self,
+        nonce: Nonce,
+        hash_fn: Arc<dyn Fn(Nonce) -> Hash + Send + Sync>,
+        cost_fn: Arc<dyn Fn() -> OpCost + Send + Sync>,
+    ) -> MiningResult {
+
+        let next_nonce = self.nonce_chain.apply(nonce);
+
+        let hash = hash_fn(next_nonce);
+
+        let score = self.evaluate_hash(hash.clone());
+
+        let cost = cost_fn();
+
+        MiningResult {
+            nonce: next_nonce,
+            hash,
+            score,
+            cost,
+        }
+    }
+
+
+
+    /// Run a mining loop.
+    pub fn mine(
+        &self,
+        start_nonce: Nonce,
+        iterations: u64,
+        hash_fn: Arc<dyn Fn(Nonce) -> Hash + Send + Sync>,
+        cost_fn: Arc<dyn Fn() -> OpCost + Send + Sync>,
+    ) -> MiningResult {
+
+        let mut best: Option<MiningResult> = None;
+        let mut nonce = start_nonce;
+
+        for _ in 0..iterations {
+
+            let result = self.step(nonce, hash_fn.clone(), cost_fn.clone());
+
+            if let Some(ref best_res) = best {
+                if result.score < best_res.score {
+                    best = Some(result.clone());
+                }
+            } else {
+                best = Some(result.clone());
+            }
+
+            nonce = result.nonce;
+        }
+
+        best.expect("Mining loop must produce at least one result")
+    }
+
+
+
+    /// Run batch mining (vectorized).
+    pub fn mine_batch(
+        &self,
+        nonces: Vec<Nonce>,
+        hash_fn: Arc<dyn Fn(Nonce) -> Hash + Send + Sync>,
+    ) -> Vec<f64> {
+
+        nonces
+            .into_iter()
+            .map(|n| {
+                let h = hash_fn(n);
+                self.evaluate_hash(h)
+            })
+            .collect()
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::primitives::{Hash, Nonce, OpCost};
+
+    fn dummy_hash(nonce: Nonce) -> Hash {
+        let mut data = [0u8; 32];
+        data[0] = (nonce.0 % 255) as u8;
+        Hash::from(data)
+    }
+
+    fn dummy_cost() -> OpCost {
+        OpCost::new(1.0, 0.1, 0.001)
+    }
+
+    #[test]
+    fn test_alchemist_step() {
+
+        let config = AlchemistConfig::default();
+        let alchemist = Alchemist::new(config);
+
+        let result = alchemist.step(
+            Nonce(1),
+            Arc::new(dummy_hash),
+            Arc::new(dummy_cost),
+        );
+
+        assert!(result.score >= 0.0);
+    }
+
+    #[test]
+    fn test_alchemist_mining() {
+
+        let config = AlchemistConfig::default();
+        let alchemist = Alchemist::new(config);
+
+        let result = alchemist.mine(
+            Nonce(1),
+            100,
+            Arc::new(dummy_hash),
+            Arc::new(dummy_cost),
+        );
+
+        assert!(result.score >= 0.0);
+    }
+
 }
