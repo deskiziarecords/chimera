@@ -4,21 +4,40 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Hardware and memory abstraction layer"
+repository.workspace = true
+description = "Hardware and distributed fabric abstraction layer for ChimeraOS"
 
 [dependencies]
-# Workspace
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
 
-# Internal
+# Chimera crates
 chimera-core = { path = "../chimera-core" }
 
-# Hardware Detection
-num_cpus = "1.0"
+# Async runtime
+tokio = { workspace = true }
 
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging / tracing
+tracing = { workspace = true }
+
+# System detection
+num_cpus = "1.16"
+
+# Optional future hardware acceleration support
+ndarray = { workspace = true, optional = true }
+
+[features]
+
+default = []
+
+# Future GPU / HPC extensions
+gpu = ["ndarray"]
+
+# Dev dependencies
 [dev-dependencies]
 tokio-test = { workspace = true }
+criterion = { workspace = true }
