@@ -1,9 +1,12 @@
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    vergen::EmitBuilder::builder()
-        .build_timestamp()
-        .rustc_semver()
-        .git_sha(true)
-        .cargo_target_triple()
-        .emit()?;
-    Ok(())
+fn main() {
+    #[cfg(feature = "build-info")]
+    {
+        use vergen::EmitBuilder;
+
+        EmitBuilder::builder()
+            .git_sha(true)
+            .rustc_semver()
+            .emit()
+            .unwrap();
+    }
 }
