@@ -1,148 +1,182 @@
-<<<<<<< HEAD
 //! ChimeraOS Core
 //!
 //! Foundational primitives, transforms, and orchestration engine for ChimeraOS.
-//! Provides standard data structures, operational metrics, and intelligent strategy generation.
+//!
+//! Provides:
+//! - Core cryptographic primitives
+//! - Differentiable transform system
+//! - Mining orchestration via Alchemist
 
 pub mod primitives;
 pub mod transforms;
 pub mod alchemist;
 
-// Re-export commonly used types for convenience
+
+
+// ==========================
+// Re-exports
+// ==========================
+
+// Primitives
 pub use primitives::{
+    AtomicNonce,
     Hash,
-    Nonce,
     NodeId,
+    Nonce,
     OpCost,
     ThermalState,
-    Difficulty,
-    BlockHeader,
-    MiningResult,
-    MiningStrategy,
-    FleetStats,
-    AtomicNonce,
-    PrimitiveError,
 };
 
+// Transforms
 pub use transforms::{
     Transform,
     Grad,
-    DifferentiableFn,
     TransformChain,
     HashTransform,
-    OpCostTransform,
     NonceTransform,
-    GradientDescent,
-    DifferentiableTransform,
-    Jacobian,
+    OpCostTransform,
     ActivationFn,
-    OptimizationResult,
-    TransformError,
+    VMap,
 };
 
+// Alchemist
 pub use alchemist::{
     Alchemist,
     AlchemistConfig,
-    AlchemistError,
-    AlchemistTelemetry,
-    IntentSpec,
-    Constraint,
-    OptimizationPriority,
-    OptimizationBackend,
-    AlgorithmProfile,
-    MiningSessionHandle,
-    SessionStatus,
-    SafetyGuard,
-    LanguageModel,
+    MiningResult,
 };
 
-/// ChimeraOS version information.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// ChimeraOS edition.
+
+// ==========================
+// Crate Information
+// ==========================
+
+pub const NAME: &str = env!("CARGO_PKG_NAME");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const EDITION: &str = "2021";
 
-/// Get ChimeraOS build information.
-pub fn build_info() -> BuildInfo {
-    BuildInfo {
-        version: VERSION.to_string(),
-        edition: EDITION.to_string(),
-        rustc: option_env!("VERGEN_RUSTC_SEMVER").unwrap_or("unknown").to_string(),
-        git_hash: option_env!("VERGEN_GIT_SHA").unwrap_or("unknown").to_string(),
-        build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP").unwrap_or("unknown").to_string(),
-    }
-}
 
-/// Build information structure.
+
+/// Build metadata for ChimeraOS.
 #[derive(Debug, Clone)]
 pub struct BuildInfo {
+    pub name: String,
     pub version: String,
     pub edition: String,
     pub rustc: String,
     pub git_hash: String,
-    pub build_timestamp: String,
 }
+
+
+
+/// Returns build information.
+pub fn build_info() -> BuildInfo {
+    BuildInfo {
+        name: NAME.to_string(),
+        version: VERSION.to_string(),
+        edition: EDITION.to_string(),
+        rustc: option_env!("VERGEN_RUSTC_SEMVER")
+            .unwrap_or("unknown")
+            .to_string(),
+        git_hash: option_env!("VERGEN_GIT_SHA")
+            .unwrap_or("unknown")
+            .to_string(),
+    }
+}
+
+
 
 impl std::fmt::Display for BuildInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ChimeraOS v{} (Rust {}, Git: {})",
-            self.version, self.rustc, self.git_hash
+            "{} v{} (Rust {}, Git: {})",
+            self.name, self.version, self.rustc, self.git_hash
         )
     }
 }
 
-/// Prelude module for convenient imports.
+
+
+// ==========================
+// Prelude
+// ==========================
+
+/// Convenient imports for downstream crates.
 pub mod prelude {
+
     pub use crate::primitives::{
-        Hash, Nonce, NodeId, OpCost, ThermalState, Difficulty, BlockHeader,
-        MiningResult, MiningStrategy, FleetStats, AtomicNonce,
+        Hash,
+        Nonce,
+        NodeId,
+        OpCost,
+        AtomicNonce,
     };
+
     pub use crate::transforms::{
-        Transform, Grad, TransformChain, HashTransform, GradientDescent,
+        Transform,
+        Grad,
+        TransformChain,
+        HashTransform,
+        NonceTransform,
+        OpCostTransform,
     };
+
     pub use crate::alchemist::{
-        Alchemist, AlchemistConfig, IntentSpec, Constraint, OptimizationPriority,
+        Alchemist,
+        AlchemistConfig,
+        MiningResult,
     };
 }
 
-/// Initialize ChimeraOS core with default configuration.
+
+
+// ==========================
+// Initialization
+// ==========================
+
+/// Initialize ChimeraOS core.
 pub fn init() -> Result<(), CoreError> {
-    // Initialize logging
-    tracing_subscriber::fmt::init();
-    
+
+    let _ = tracing_subscriber::fmt::try_init();
+
     tracing::info!("ChimeraOS Core initialized (v{})", VERSION);
+
     Ok(())
 }
 
-/// Core-specific error types.
+
+
 #[derive(Debug, thiserror::Error)]
 pub enum CoreError {
+
     #[error("Initialization failed: {0}")]
     InitializationFailed(String),
+
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
+
     #[error("Module error: {0}")]
     ModuleError(String),
 }
 
+
+
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use primitives::{Hash, Nonce, OpCost};
-    use transforms::{HashTransform, ActivationFn};
 
     #[test]
     fn test_build_info() {
         let info = build_info();
         assert_eq!(info.version, VERSION);
-        assert_eq!(info.edition, EDITION);
     }
 
     #[test]
-    fn test_prelude_imports() {
-        // Verify prelude exports work correctly
+    fn test_primitives() {
         let _hash: Hash = Hash::zero();
         let _nonce: Nonce = Nonce::zero();
         let _cost: OpCost = OpCost::zero();
@@ -150,67 +184,7 @@ mod tests {
 
     #[test]
     fn test_core_init() {
-        let result = init();
-        assert!(result.is_ok());
+        assert!(init().is_ok());
     }
 
-    #[test]
-    fn test_hash_transform_via_prelude() {
-        use prelude::HashTransform;
-        let transform = HashTransform::new(32, ActivationFn::ReLU);
-        let hash = Hash::zero();
-        let output = transform.apply(hash);
-        assert_eq!(output.len(), 32);
-    }
-
-    #[test]
-    fn test_version_constants() {
-        assert!(!VERSION.is_empty());
-        assert_eq!(EDITION, "2021");
-    }
 }
-=======
-//! # ChimeraOS Core
-//!
-//! The foundational library for the ChimeraOS orchestration system.
-//! 
-//! This crate provides:
-//! - **Primitives**: Core data types (`Hash`, `Nonce`, `OpCost`) for cryptographic operations.
-//! - **Transforms**: JAX-style differentiable programming traits and structures.
-//! - **Alchemist**: The LLM-driven engine for parsing natural language into mining strategies.
-//!
-//! ## Example
-//!
-//! ```rust
-//! use chimera_core::{Hash, Nonce, Alchemist};
-//!
-//! // Basic primitive usage
-//! let hash = Hash::zero();
-//! println!("Zero hash: {}", hash);
-//! ```
-
-// --- Public Module Declarations ---
-pub mod alchemist;
-pub mod primitives;
-pub mod transforms;
-
-// --- Convenience Re-exports ---
-// This allows users to use `chimera_core::Hash` instead of `chimera_core::primitives::Hash`.
-
-// Primitives
-pub use primitives::{AtomicNonce, Hash, NodeId, Nonce, OpCost, ThermalState};
-
-// Transforms
-pub use transforms::{BoxedFunction, Grad, Transform, VMap};
-
-// Alchemist Engine
-pub use alchemist::{Alchemist, AlchemistConfig, AlchemistError, LanguageModel, MiningStrategy};
-
-// External Re-exports (optional, commonly used by consumers)
-pub use serde::{Deserialize, Serialize};
-pub use thiserror::Error;
-
-// --- Crate Information ---
-pub const NAME: &str = env!("CARGO_PKG_NAME");
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
->>>>>>> b1c3fa6ecf5982d921dbc44b3f253667a676f19b
