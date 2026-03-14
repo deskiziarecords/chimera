@@ -1,8 +1,9 @@
 //! Signal processing module (Sonar).
 //! Phase 3: Processes signal data for pattern recognition.
 
-use chimera_core::primitives::Hash;
+use chimera_core::primitives::{Hash, OpCost};
 use crate::{SubsystemError, SubsystemOperation};
+use blake3::Hasher;
 
 pub struct SignalProcessor {
     sample_rate: f64,
@@ -10,47 +11,88 @@ pub struct SignalProcessor {
 }
 
 impl SignalProcessor {
+
     pub fn new() -> Self {
         Self {
-            sample_rate: 44100.0,  // Standard audio sample rate
+            sample_rate: 44100.0,
             filter_order: 64,
         }
     }
 
-    /// Process signal data for pattern recognition.
-    pub async fn process(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
-        // Phase 3: Signal processing
-        // Could include FFT, filtering, pattern matching, etc.
-        
+    pub fn process(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
+
         let signal = self.bytes_to_signal(input);
-        let processed = self.apply_filter(signal)?;
-        let features = self.extract_features(processed);
-        
-        Ok(self.features_to_hash(features))
+
+        let filtered = self.apply_filter(&signal)?;
+
+        let features = self.extract_features(&filtered);
+
+        Ok(self.features_to_hash(&features))
     }
 
     fn bytes_to_signal(&self, input: &[u8]) -> Vec<f64> {
-        input.iter().map(|&b| b as f64 / 255.0).collect()
+
+        input.iter()
+            .map(|&b| (b as f64 / 255.0) * 2.0 - 1.0)
+            .collect()
     }
 
-    fn apply_filter(&self, signal: Vec<f64>) -> Result<Vec<f64>, SubsystemError> {
-        // Phase 3: Simplified filter implementation
-        // Real implementation would include FFT, bandpass filters, etc.
-        Ok(signal)
-    }
+    /// Simple moving-average FIR filter
+    fn apply_filter(&self, signal: &[f64]) -> Result<Vec<f64>, SubsystemError> {
 
-    fn extract_features(&self, signal: Vec<f64>) -> Vec<f64> {
-        // Phase 3: Feature extraction
-        // Could include spectral features, temporal features, etc.
-        signal
-    }
+        let mut out = Vec::with_capacity(signal.len());
 
-    fn features_to_hash(&self, features: Vec<f64>) -> Hash {
-        let mut hash = [0u8; 32];
-        for (i, &value) in features.iter().take(32).enumerate() {
-            hash[i] = (value * 255.0) as u8;
+        for i in 0..signal.len() {
+
+            let start = i.saturating_sub(self.filter_order);
+            let window = &signal[start..=i];
+
+            let sum: f64 = window.iter().sum();
+
+            out.push(sum / window.len() as f64);
         }
-        Hash(hash)
+
+        Ok(out)
+    }
+
+    fn extract_features(&self, signal: &[f64]) -> Vec<f64> {
+
+        let mut features = Vec::new();
+
+        // RMS energy
+        let rms = (signal.iter().map(|x| x * x).sum::<f64>() / signal.len() as f64).sqrt();
+        features.push(rms);
+
+        // mean amplitude
+        let mean = signal.iter().sum::<f64>() / signal.len() as f64;
+        features.push(mean);
+
+        // zero crossing rate
+        let mut crossings = 0;
+        for i in 1..signal.len() {
+            if signal[i - 1].signum() != signal[i].signum() {
+                crossings += 1;
+            }
+        }
+
+        features.push(crossings as f64 / signal.len() as f64);
+
+        // max amplitude
+        let max = signal.iter().fold(0.0_f64, |a, &b| a.max(b.abs()));
+        features.push(max);
+
+        features
+    }
+
+    fn features_to_hash(&self, features: &[f64]) -> Hash {
+
+        let mut hasher = Hasher::new();
+
+        for f in features {
+            hasher.update(&f.to_le_bytes());
+        }
+
+        Hash(*hasher.finalize().as_bytes())
     }
 }
 
@@ -61,13 +103,13 @@ impl Default for SignalProcessor {
 }
 
 impl SubsystemOperation for SignalProcessor {
+
     fn execute(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
-        tokio::runtime::Handle::current()
-            .block_on(self.process(input))
+        self.process(input)
     }
 
-    fn cost(&self) -> chimera_core::primitives::OpCost {
-        chimera_core::primitives::OpCost {
+    fn cost(&self) -> OpCost {
+        OpCost {
             joules: 0.001,
             seconds: 0.0001,
             dollars: 0.00001,
