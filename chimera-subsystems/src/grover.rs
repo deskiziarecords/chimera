@@ -1,10 +1,10 @@
 //! Quantum algorithm validation (Grover's Algorithm).
-//! Phase 3: Validates quantum-inspired optimization for search problems.
+//! Phase 3: Quantum-inspired optimization validator.
 
-use chimera_core::primitives::Hash;
+use chimera_core::primitives::{Hash, OpCost};
 use crate::{SubsystemError, SubsystemOperation};
 use num_complex::Complex64;
-use std::sync::Arc;
+use blake3::Hasher;
 
 pub struct GroverValidator {
     qubit_count: usize,
@@ -12,53 +12,86 @@ pub struct GroverValidator {
 }
 
 impl GroverValidator {
+
     pub fn new() -> Self {
         Self {
-            qubit_count: 8,  // Simplified for Phase 3
+            qubit_count: 8,
             iterations: 10,
         }
     }
 
-    /// Simulate Grover's algorithm for search optimization.
-    pub async fn validate(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
-        // Phase 3: Simplified quantum state simulation
-        // Real implementation would use quantum circuit simulation
-        
+    pub fn validate(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
+
         let mut state = self.initialize_state();
-        
+
         for _ in 0..self.iterations {
-            state = self.oracle(&state, input)?;
-            state = self.diffuser(&state)?;
+
+            self.oracle(&mut state, input)?;
+            self.diffuser(&mut state)?;
         }
 
-        // Measure and convert to hash
-        let measured = self.measure(&state);
-        Ok(Hash(measured))
+        Ok(self.measure(&state))
     }
 
     fn initialize_state(&self) -> Vec<Complex64> {
-        // Initialize equal superposition state
+
         let size = 1 << self.qubit_count;
-        let amplitude = Complex64::new(1.0 / (size as f64).sqrt(), 0.0);
-        vec![amplitude; size]
+        let amplitude = 1.0 / (size as f64).sqrt();
+
+        vec![Complex64::new(amplitude, 0.0); size]
     }
 
-    fn oracle(&self, state: &[Complex64], input: &[u8]) -> Result<Vec<Complex64>, SubsystemError> {
-        // Phase 3: Simplified oracle implementation
-        // Marks the target state based on input
-        Ok(state.to_vec())
+    fn oracle(
+        &self,
+        state: &mut [Complex64],
+        input: &[u8],
+    ) -> Result<(), SubsystemError> {
+
+        let target = self.target_index(input);
+
+        if target < state.len() {
+            state[target] = -state[target]; // phase inversion
+        }
+
+        Ok(())
     }
 
-    fn diffuser(&self, state: &[Complex64]) -> Result<Vec<Complex64>, SubsystemError> {
-        // Phase 3: Simplified diffuser implementation
-        // Amplifies the marked state
-        Ok(state.to_vec())
+    fn diffuser(
+        &self,
+        state: &mut [Complex64],
+    ) -> Result<(), SubsystemError> {
+
+        let mean: Complex64 =
+            state.iter().sum::<Complex64>() / (state.len() as f64);
+
+        for amp in state.iter_mut() {
+            *amp = 2.0 * mean - *amp;
+        }
+
+        Ok(())
     }
 
-    fn measure(&self, state: &[Complex64]) -> [u8; 32] {
-        // Phase 3: Simplified measurement
-        // Convert quantum state to classical hash
-        [0u8; 32]
+    fn measure(&self, state: &[Complex64]) -> Hash {
+
+        let mut hasher = Hasher::new();
+
+        for amp in state {
+            hasher.update(&amp.re.to_le_bytes());
+            hasher.update(&amp.im.to_le_bytes());
+        }
+
+        Hash(*hasher.finalize().as_bytes())
+    }
+
+    fn target_index(&self, input: &[u8]) -> usize {
+
+        let mut acc: usize = 0;
+
+        for b in input {
+            acc = acc.wrapping_mul(31).wrapping_add(*b as usize);
+        }
+
+        acc % (1 << self.qubit_count)
     }
 }
 
@@ -69,14 +102,13 @@ impl Default for GroverValidator {
 }
 
 impl SubsystemOperation for GroverValidator {
+
     fn execute(&self, input: &[u8]) -> Result<Hash, SubsystemError> {
-        // Synchronous wrapper for async validate
-        tokio::runtime::Handle::current()
-            .block_on(self.validate(input))
+        self.validate(input)
     }
 
-    fn cost(&self) -> chimera_core::primitives::OpCost {
-        chimera_core::primitives::OpCost {
+    fn cost(&self) -> OpCost {
+        OpCost {
             joules: 0.001,
             seconds: 0.0001,
             dollars: 0.00001,
